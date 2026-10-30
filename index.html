@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>鹈鹕骑车环岛 · 3D</title>
+<meta name="description" content="一只戴围巾的鹈鹕骑着自行车环岛兜风。实时 3D：昼夜循环、雷雨与彩虹、海浪、灯塔、程序化音乐，可以自己驾驶、跳台、吃鱼。">
+<meta name="theme-color" content="#0f2a3d">
+<meta property="og:title" content="鹈鹕骑车环岛 · 3D">
+<meta property="og:description" content="一只戴围巾的鹈鹕骑着自行车环岛兜风。可以自己骑、跳台、吃鱼、换天气。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='17' cy='46' r='11' fill='none' stroke='%2313a8a0' stroke-width='4'/%3E%3Ccircle cx='47' cy='46' r='11' fill='none' stroke='%2313a8a0' stroke-width='4'/%3E%3Cellipse cx='30' cy='26' rx='12' ry='9' fill='%23f6f2ea'/%3E%3Ccircle cx='38' cy='13' r='6' fill='%23f6f2ea'/%3E%3Cpath d='M42 12 L62 17 L43 19 Z' fill='%23f6a333'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<link rel="modulepreload" href="vendor/three.module.min.js">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body data-cam="cinema">
+<canvas id="c" aria-label="3D 场景：鹈鹕骑自行车环岛"></canvas>
+
+<div id="loader" role="status" aria-live="polite">
+  <div class="loadcard">
+    <svg class="loadbike" viewBox="0 0 120 70" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><circle class="wh" cx="26" cy="48" r="17"/><circle class="wh" cx="94" cy="48" r="17"/><path d="M26 48 L50 48 L78 22 M50 48 L44 24 M38 24 L52 24 M94 48 L80 18 L70 18"/></g></svg>
+    <div class="bar"><span id="bar"></span></div>
+    <p id="loadmsg">准备中…</p>
+  </div>
+</div>
+
+<section id="start" class="hidden" aria-labelledby="title">
+  <div class="startcard">
+    <p class="kicker">实时 3D · 浏览器里直接运行</p>
+    <h1 id="title">鹈鹕骑车环岛</h1>
+    <p class="lede">戴红围巾的鹈鹕要绕小岛骑一圈。沿路有小鱼和金鱼，四个木头跳台，还有灯塔、风车、渔村和码头。天色会从傍晚一直走到深夜和第二天清晨。</p>
+    <div class="cta">
+      <button id="btn-start" class="primary">开始骑行（有声音）</button>
+      <button id="btn-start-quiet" class="ghost">静音进入</button>
+    </div>
+    <ul class="keys" aria-label="操作说明">
+      <li><kbd>←</kbd><kbd>→</kbd> 换道</li>
+      <li><kbd>↑</kbd> 加速 <kbd>↓</kbd> 刹车</li>
+      <li><kbd>空格</kbd> 跳</li>
+      <li><kbd>B</kbd> 打铃</li>
+      <li><kbd>C</kbd> 换镜头</li>
+      <li><kbd>R</kbd> 换天气</li>
+    </ul>
+  </div>
+</section>
+
+<div id="shotname" class="shotname" aria-hidden="true"></div>
+<div id="toasts" aria-live="polite"></div>
+
+<header id="hud" class="hud">
+  <div class="gauge">
+    <div class="spd"><span id="speed">0</span><small>km/h</small></div>
+    <div id="effort" class="effort" title="用力程度"><i></i></div>
+  </div>
+  <dl class="stats">
+    <div><dt>得分</dt><dd><span id="score">0</span> <b id="combo"></b></dd></div>
+    <div><dt>鱼</dt><dd id="fish">0</dd></div>
+    <div><dt>里程</dt><dd id="dist">0 m</dd></div>
+    <div><dt>最高</dt><dd id="best">0</dd></div>
+  </dl>
+  <canvas id="map" width="150" height="150" aria-label="小地图"></canvas>
+</header>
+
+<nav id="dock" class="dock" aria-label="控制面板">
+  <div class="row">
+    <button id="btn-auto" aria-pressed="true" title="自动巡航 (M)"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9M12 7v5l3 3"/></svg><span>自动</span></button>
+    <button id="btn-cam" title="切换镜头 (C)"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="14" height="11" rx="2"/><path d="M17 11l4-3v9l-4-3"/></svg><span id="camlabel">电影</span></button>
+    <button id="btn-weather" title="切换天气 (R)"><svg viewBox="0 0 24 24"><path d="M7 17a4 4 0 0 1 0-8 5 5 0 0 1 9.6 1.4A3.5 3.5 0 0 1 17 17Z"/></svg><span id="weatherlabel">晴</span></button>
+    <button id="btn-bell" title="打铃 (B)"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4Z M10 20a2 2 0 0 0 4 0"/></svg><span>打铃</span></button>
+    <button id="btn-jump" title="跳 (空格)"><svg viewBox="0 0 24 24"><path d="M4 18h16M7 14l5-8 5 8"/></svg><span>跳</span></button>
+    <button id="btn-photo" title="截图 (P)"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>截图</span></button>
+  </div>
+  <div class="row sliders">
+    <label class="slider"><span>时间 <b id="clock">16:33</b></span><input id="tod" type="range" min="0" max="1" step="0.001" value="0.69" aria-label="一天中的时间"></label>
+    <button id="btn-flow" class="mini" aria-pressed="true" title="时间是否自动流逝">流逝</button>
+    <label class="slider"><span>巡航 <b id="cruiseval">25 km/h</b></span><input id="cruise" type="range" min="2" max="11" step="0.5" value="7" aria-label="巡航速度"></label>
+  </div>
+  <div class="row small">
+    <button id="btn-sound" class="mini" aria-pressed="false">声音</button>
+    <button id="btn-music" class="mini" aria-pressed="true">音乐</button>
+    <button id="btn-quality" class="mini" title="画质">画质 <b id="qlabel">自动</b></button>
+    <button id="btn-share" class="mini" title="复制当前场景的链接">分享</button>
+    <button id="btn-pause" class="mini" aria-pressed="false" title="暂停 (Esc)">暂停</button>
+    <button id="btn-help" class="mini" title="帮助 (?)">?</button>
+  </div>
+</nav>
+
+<div class="touchpad" aria-hidden="true">
+  <button data-hold="left" class="tp l">◀</button>
+  <button data-hold="right" class="tp r">▶</button>
+  <button data-hold="up" class="tp u">加速</button>
+  <button data-hold="down" class="tp d">刹车</button>
+</div>
+
+<div id="pausecard" class="pausecard"><p>已暂停</p><button id="btn-resume" class="primary">继续</button></div>
+
+<dialog id="help" aria-labelledby="helptitle">
+  <h2 id="helptitle">怎么玩</h2>
+  <p>默认是自动巡航，鹈鹕会自己找鱼、对准跳台。按 <kbd>←</kbd> <kbd>→</kbd> 就切到手动，按 <kbd>M</kbd> 切回来。</p>
+  <table>
+    <tr><td><kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd></td><td>换道</td></tr>
+    <tr><td><kbd>↑</kbd> / <kbd>W</kbd></td><td>冲刺（最高约 49 km/h）</td></tr>
+    <tr><td><kbd>↓</kbd> / <kbd>S</kbd></td><td>刹车</td></tr>
+    <tr><td><kbd>空格</kbd></td><td>原地跳。冲上木头跳台会飞得更高，空中能吃到高处的金鱼</td></tr>
+    <tr><td><kbd>B</kbd> / 双击画面</td><td>打铃，鹈鹕会挥翅膀</td></tr>
+    <tr><td><kbd>C</kbd></td><td>镜头：跟随 → 电影 → 自由环绕 → 鹈鹕视角</td></tr>
+    <tr><td><kbd>R</kbd></td><td>天气：晴 → 多云 → 雷雨。雨停后傍晚或上午可能出彩虹</td></tr>
+    <tr><td><kbd>N</kbd></td><td>白天和夜晚之间跳转</td></tr>
+    <tr><td><kbd>P</kbd> / <kbd>H</kbd></td><td>截图 / 隐藏界面</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>暂停</td></tr>
+  </table>
+  <p class="fine">跟随镜头下可以拖动画面转视角。连续吃鱼会叠加倍数（最高 ×8），腾空超过半秒有额外加分，每骑完一圈 +100。最高分保存在本机浏览器。所有模型、贴图、音乐和音效都由代码实时生成，页面没有加载任何图片或音频文件。</p>
+  <button id="btn-help-close" class="primary">知道了</button>
+</dialog>
+
+<noscript><p class="noscript">这个页面需要开启 JavaScript。</p></noscript>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
